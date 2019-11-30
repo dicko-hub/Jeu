@@ -46,6 +46,11 @@ class Personnage
      */
     private $type;
 
+    /**
+     * @ORM\ManyToOne(targetEntity="App\Entity\Salle", inversedBy="personnages")
+     */
+    private $salle;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -119,6 +124,18 @@ class Personnage
     public function setType(string $type): self
     {
         $this->type = $type;
+
+        return $this;
+    }
+
+    public function getSalle(): ?Salle
+    {
+        return $this->salle;
+    }
+
+    public function setSalle(?Salle $salle): self
+    {
+        $this->salle = $salle;
 
         return $this;
     }
