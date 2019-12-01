@@ -96,34 +96,8 @@ class JeuController extends Controller
         {
             if($direction==$value)
             {
-
-                switch ($key){
-                    case 1:
-                        $salleNext = $SalleRepository->find(19);
+                        $salleNext = $SalleRepository->find($key);
                         $guid->setSalle($salleNext);
-                    break;
-                    case 2:
-                        $salleNext = $SalleRepository->find(20);
-                        $guid->setSalle($salleNext);
-                    break;
-                    case 3:
-                        $salleNext = $SalleRepository->find(21);
-                        $guid->setSalle($salleNext);
-                    break;
-                    case 4:
-                        $salleNext = $SalleRepository->find(22);
-                        $guid->setSalle($salleNext);
-                    break;
-                    case 5:
-                        $salleNext = $SalleRepository->find(23);
-                        $guid->setSalle($salleNext);
-                    break;
-                    case 6:
-                        $salleNext = $SalleRepository->find(24);
-                        $guid->setSalle($salleNext);
-                    break;
-                    
-                }
                 $manager->persist($guid);
                 $manager->flush();
             }
@@ -146,7 +120,7 @@ class JeuController extends Controller
         $salleGuid = $SalleRepository->find($guid->getSalle());
         $salleCible = $SalleRepository->find($cible->getSalle());
        // if($salleGuid->getId()==$salleCible->getId())
-        return $salleCible;
+        return $cible;
     }
 
      /**
@@ -170,27 +144,7 @@ class JeuController extends Controller
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
         $salleGuid = $SalleRepository->find($guid->getSalle());
         $salleCible=new Salle();
-        switch ($cible){
-            case 1:
-                $salleCible = $SalleRepository->find(19);
-            break;
-            case 2:
-                $salleCible = $SalleRepository->find(20);
-            break;
-            case 3:
-                $salleCible= $SalleRepository->find(21);
-            break;
-            case 4:
-                $salleCible = $SalleRepository->find(22);
-            break;
-            case 5:
-                $salleCible = $SalleRepository->find(23);
-            break;
-            case 6:
-                $salleCible= $SalleRepository->find(24);
-            break;
-            
-        }
+                $salleCible = $SalleRepository->find($cible);
        // if($salleGuid->getId()==$salleCible->getId())
         return $joueurCible;
     }
