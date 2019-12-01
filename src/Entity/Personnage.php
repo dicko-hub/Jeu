@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use JMS\Serializer\Annotation as Serializer;
 
 /**
  * @ORM\Entity(repositoryClass="App\Repository\PersonnageRepository")
@@ -18,6 +19,7 @@ class Personnage
 
     /**
      * @ORM\Column(type="integer")
+     * @Serializer\Groups({"connect_joueur","salle"})
      */
     private $guid;
 
@@ -28,26 +30,31 @@ class Personnage
 
     /**
      * @ORM\Column(type="integer", nullable=true)
+     * @Serializer\Groups({"joueur"})
      */
     private $vie;
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Serializer\Groups({"joueur"})
      */
     private $description;
 
     /**
      * @ORM\Column(type="integer")
+     * @Serializer\Groups({"connect_joueur","joueur"})
      */
     private $totalVie;
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Serializer\Groups({"joueur"})
      */
     private $type;
 
     /**
      * @ORM\ManyToOne(targetEntity="App\Entity\Salle", inversedBy="personnages")
+     * @Serializer\Groups({"connect_joueur"})
      */
     private $salle;
 
