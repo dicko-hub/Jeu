@@ -36,13 +36,13 @@ class JeuController extends Controller
      *    path = "/connect",
      *    name = "jeu_joueur_creer"
      * )
-     * @Rest\View(StatusCode = 201)
+     * @Rest\View(StatusCode = 201,serializerGroups={"connect_joueur"})
      */
     public function creerJoueur()
     {
         //je recupere la premiere salle
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
-        $salle = $SalleRepository->find(19);
+        $salle = $SalleRepository->find(1);
         $joueur=new Personnage();
         $PersonnageRepository = $this->getDoctrine()->getRepository(Personnage::class);
         $joueurs=$PersonnageRepository->findBy(array(), array('id' => 'desc'),1,0);
@@ -56,8 +56,28 @@ class JeuController extends Controller
                 ->setTotalVie(100)
                 ->setSalle($salle)
                 ->setType("Joueur");
-        
-        return $joueur;
+
+        //code de sortie vers le client
+        $passages=[];
+        $entites=[];
+        foreach ($joueur->getSalle()->getPassages() as $value)
+        {
+            array_push($passages,$value);
+        }
+        foreach ($salle->getPersonnages() as $key=>$value)
+        {
+          array_push($entites,$value->getGuid());
+        }
+
+        $retour=["guid"=>$joueur->getGuid(),
+                 "totalVie"=>$joueur->getTotalVie(),
+                 "salle"=>[
+                     "description"=>$joueur->getSalle()->getDescription(),
+                     "passages"=>$passages,
+                     "entites"=>$entites
+                 ]
+    ];
+        return $retour;
     }
 
      
@@ -67,13 +87,30 @@ class JeuController extends Controller
      *     name = "jeu_joueur_regarder",
      *     requirements = {"guid"="\d+"}
      * )
-     * @View
+     * @Rest\View(serializerGroups={"salle"})
      */
     public function regarder(Personnage $guid)
     {
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
         $salle = $SalleRepository->find($guid->getSalle());
-        return $salle;
+
+        //code de sortir vers le client
+        $passages=[];
+        $entites=[];
+        foreach ($salle->getPassages() as $value)
+        {
+            array_push($passages,$value);
+        }
+        foreach ($salle->getPersonnages() as $key=>$value)
+        {
+          array_push($entites,$value->getGuid());
+        }
+
+        $retour=[    "description"=>$salle->getDescription(),
+                     "passages"=>$passages,
+                     "entites"=>$entites
+    ];
+        return $retour;
     }
 
     /**
@@ -82,7 +119,7 @@ class JeuController extends Controller
      *     name = "jeu_joueur_deplacement",
      *     requirements = {"guid"="\d+"}
      * )
-     * @View
+     * @Rest\View(serializerGroups={"salle"})
      */
     public function deplacement(Personnage $guid,Request $request,ObjectManager $manager)
     {
@@ -103,7 +140,24 @@ class JeuController extends Controller
             }
         }
         $salleActuel=$SalleRepository->find($guid->getSalle());
-        return $salleActuel;
+
+        //code de sortir vers le client
+        $passages=[];
+        $entites=[];
+        foreach ($salleActuel->getPassages() as $value)
+        {
+            array_push($passages,$value);
+        }
+        foreach ($salleActuel->getPersonnages() as $key=>$value)
+        {
+          array_push($entites,$value->getGuid());
+        }
+
+        $retour=[    "description"=>$salleActuel->getDescription(),
+                     "passages"=>$passages,
+                     "entites"=>$entites
+    ];
+        return $retour;
     }
 
      /**
@@ -112,7 +166,7 @@ class JeuController extends Controller
      *     name = "jeu_joueur_examiner",
      *     requirements = {"guid"="\d+","cible"="\d+"}
      * )
-     * @View
+     * @Rest\View(serializerGroups={"joueur"})
      */
     public function examiner(Personnage $guid,Personnage $cible )
     {
@@ -120,7 +174,14 @@ class JeuController extends Controller
         $salleGuid = $SalleRepository->find($guid->getSalle());
         $salleCible = $SalleRepository->find($cible->getSalle());
        // if($salleGuid->getId()==$salleCible->getId())
-        return $cible;
+
+       //code de sortie vers le client
+       $retour=["description"=>$cible->getDescription(),
+                "type"=>$cible->getType(),
+                "vie"=>$cible->getVie(),
+                "totalvie"=>$cible->getTotalVie(),
+   ];
+        return $retour;
     }
 
      /**
@@ -129,7 +190,7 @@ class JeuController extends Controller
      *     name = "jeu_joueur_taper",
      *     requirements = {"guid"="\d+"}
      * )
-     * @View
+     * @Rest\View(serializerGroups={"joueur"})
      */
     public function taper(Personnage $guid,Request $request,ObjectManager $manage)
     {
@@ -137,16 +198,22 @@ class JeuController extends Controller
         $result= json_decode($data);
         $cible = $result->{'cible'};
 
-        $joueurCible=new Personnage();
         $PersonnageRepository= $this->getDoctrine()->getRepository(Personnage::class);
         $joueurCible=$PersonnageRepository->find($cible);
 
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
         $salleGuid = $SalleRepository->find($guid->getSalle());
-        $salleCible=new Salle();
-                $salleCible = $SalleRepository->find($cible);
+        $salleCible = $SalleRepository->find($cible);
        // if($salleGuid->getId()==$salleCible->getId())
-        return $joueurCible;
+
+       
+       //code de sortie vers le client
+       $retour=["description"=>$joueurCible->getDescription(),
+                "type"=>$joueurCible->getType(),
+                "vie"=>$joueurCible->getVie(),
+                "totalvie"=>$joueurCible->getTotalVie(),
+   ];
+        return $retour;
     }
 
   
