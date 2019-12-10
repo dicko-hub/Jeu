@@ -18,6 +18,9 @@ use App\Repository\SalleRepository;
 use FOS\RestBundle\Controller\Annotations\Get;
 use FOS\RestBundle\Controller\Annotations\Post;
 use FOS\RestBundle\Controller\Annotations\View;
+use App\Exception\NotSameRoomException;
+use App\Exception\RessourceNotFound;
+use App\Exception\WallException;
 
 class JeuController extends Controller
 {
@@ -73,7 +76,7 @@ class JeuController extends Controller
     ];
     return $retour;
 }
-        public function modelerSalle($joueur){
+    public function modelerSalle($joueur){
             $salle=$joueur->getSalle();
             //code de sortir vers le client
         $passages=[];
@@ -93,15 +96,18 @@ class JeuController extends Controller
     ];
         return $retour;
         }
-        public function examinerJoueur($cible){
+
+    public function examinerJoueur($cible){
             $retour=["description"=>$cible->getDescription(),
                 "type"=>$cible->getType(),
                 "vie"=>$cible->getVie(),
                 "totalvie"=>$cible->getTotalVie(),
-   ];
-    return $retour;
+             ];
+            return $retour;
         }
-        public function ImpactTaper($joueurCible,$guid){
+
+    public function ImpactTaper($joueurCible,$guid){
+
         $manager = $this->getDoctrine()->getManager();
         $vieActuelle=$joueurCible->getVie()- $guid->getDegats();
         $degatsActuelle=$guid->getDegats()+5;
@@ -110,6 +116,48 @@ class JeuController extends Controller
         $manager->persist($joueurCible,$guid);
         $manager->flush();
         }
+
+    public function executionDeplacement($guid,$data){
+
+        $manager = $this->getDoctrine()->getManager();
+        if(empty($data) || !is_string((json_decode($data))->{'direction'}))
+            throw new NotSameRoomException("information json non valide");
+
+        $result= json_decode($data);
+        $direction = $result->{'direction'};
+        $direction=strtoupper($direction);
+
+        $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
+        $salle = $SalleRepository->find($guid->getSalle());
+        $trouver=false;
+        foreach ($salle->getPassages() as $key => $value)
+        {
+            if($direction==$value)
+            {
+                        $salleNext = $SalleRepository->find($key);
+                        $guid->setSalle($salleNext);
+                $manager->persist($guid);
+                $manager->flush();
+                $trouver=true;
+            }
+        }
+        if(!$trouver){
+            //lieu ou declanchez l'exception si la direction n'existe pas
+            throw new WallException("vous avez prix un mur");
+           
+        }
+        }
+
+    public function memeSalle($guid,$cible){
+        $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
+
+        $salleGuid = $SalleRepository->find($guid->getSalle());
+        $salleCible = $SalleRepository->find($cible->getSalle());
+        if($salleGuid->getId()!=$salleCible->getId()){
+            //lieu ou lever l'exception si les deux personnages ne sont pas dans la meme salle
+            throw new NotSameRoomException("vous n'etes pas dans la meme salle");
+        }
+    }
     /**
      * @Route("/jeu", name="jeu")
      */
@@ -147,17 +195,6 @@ class JeuController extends Controller
      */
     public function regarder(Personnage $guid)
     {
-        //code de verification de l'existence du joueur
-        $PersonnageRepository = $this->getDoctrine()->getRepository(Personnage::class);
-        try {
-            $joueurAverifier=$PersonnageRepository->find($guid->getId());
-        } catch (\Throwable $th) {
-            //lieu ou lever l'exception si l'identifiant du joueur n'existe pas
-        }
-        //code de recupereation de la salle du joueur 
-        $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
-        $salle = $SalleRepository->find($guid->getSalle());
-
         //code de sortie vers le client
         return self::modelerSalle($guid);
         
@@ -173,40 +210,9 @@ class JeuController extends Controller
      */
     public function deplacement(Personnage $guid,Request $request,ObjectManager $manager)
     {
-        try {
             $data = $request->getContent();
-        } catch (\Throwable $th) {
-            //lieu ou lever l'exception si aucune direction n'est reçu dans le corps du post
-        }
-        $result= json_decode($data);
-        $direction = $result->{'direction'};
-        $direction=strtoupper($direction);
-
-        $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
-        $salle = $SalleRepository->find($guid->getSalle());
-        $trouver=false;
-        foreach ($salle->getPassages() as $key => $value)
-        {
-            if($direction==$value)
-            {
-                        $salleNext = $SalleRepository->find($key);
-                        $guid->setSalle($salleNext);
-                $manager->persist($guid);
-                $manager->flush();
-                $trouver=true;
-            }
-        }
-        if(!$trouver){
-            //lieu ou declanchez l'exception si la direction n'existe pas
-           /* $message=[
-                "type"=> "MUR", 
-                "message"=>"Vous avez pris un mur",
-                "code"=>409
-            ];
-            return $message;*/
-        }
-        $salleActuel=$SalleRepository->find($guid->getSalle());
-
+            //lieu ou lever l'exception si aucune direction n'est reçu dans le corps du post ou invalide
+            self::executionDeplacement($guid,$data);
         //code de sortir vers le client
         return self::modelerSalle($guid);
     }
@@ -221,26 +227,8 @@ class JeuController extends Controller
      */
     public function examiner(Personnage $guid,Personnage $cible )
     {
-        $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
-        $PersonnageRepository=$this->getDoctrine()->getRepository(Personnage::class);
-        try {
-            $guidAverifier=$PersonnageRepository->find($guid->getId());
-            $cibleAverifier=$PersonnageRepository->find($cible->getId());
-
-        } catch (\Throwable $th) {
-            //lieu ou lever l'exception si l'identifiant du joueur ou de la cible  n'existe pas
-        }
-        $salleGuid = $SalleRepository->find($guid->getSalle());
-        $salleCible = $SalleRepository->find($cible->getSalle());
-        if($salleGuid->getId()!=$salleCible->getId()){
-            //lieu ou lever l'exception si les deux personnages ne sont pas dans la meme salle
-           /* $violations=[
-                "type"=> "DIFFSALLE", 
-                "message"=>"Vous n'êtes pas dans la même salle",
-            ];
-            return $this->view($violations,Response::HTTP_CONFLICT);*/
-
-        }
+        //verifie si ils sont dans la meme salle, sinon il aura une exception
+        self::memeSalle($guid,$cible);
 
        //code de sortie vers le client
        
@@ -258,29 +246,25 @@ class JeuController extends Controller
     public function taper(Personnage $guid,Request $request,ObjectManager $manager)
     {
         $PersonnageRepository=$this->getDoctrine()->getRepository(Personnage::class);
-        try {
-            $guidAverifier=$PersonnageRepository->find($guid->getId());
+    
             $data = $request->getContent();
+            if(empty($data) || !is_int((json_decode($data))->{'cible'}))
+                throw new NotSameRoomException("information json non valide");
             $result= json_decode($data);
             $cible = $result->{'cible'};
             $joueurCible=$PersonnageRepository->find($cible);
-
-        } catch (\Throwable $th) {
-            //lieu ou lever l'exception si l'identifiant du joueur  n'existe pas
-        }
+            if(!$joueurCible instanceof Personnage){
+                //lieu ou lever l'exception si l'identifiant du joueur  n'existe pas
+                throw new RessourceNotFound("votre cible  n'existe pas ");
+            }
 
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
         $salleGuid = $SalleRepository->find($guid->getSalle());
         $salleCible = $SalleRepository->find($cible);
-       //if($salleGuid->getId()!=$salleCible->getId()){
+       if($salleGuid->getId()!=$salleCible->getId()){
         //lieu ou lever l'exception si les deux personnages ne sont pas dans la meme salle
-       /* $violations=[
-            "type"=> "DIFFSALLE", 
-            "message"=>"Vous n'êtes pas dans la même salle",
-        ];
-        return $this->view($violations,Response::HTTP_CONFLICT);
-
-    }*/
+        throw new NotSameRoomException("vous n'etes pas dans la meme salle");
+    }
        //code effectuant les dommage de l'attaque sur la cible
        self::ImpactTaper($joueurCible,$guid);
        //code de sortie vers le client
