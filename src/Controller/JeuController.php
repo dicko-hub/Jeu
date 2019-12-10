@@ -260,7 +260,7 @@ class JeuController extends Controller
 
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
         $salleGuid = $SalleRepository->find($guid->getSalle());
-        $salleCible = $SalleRepository->find($cible);
+        $salleCible = $SalleRepository->find($joueurCible->getSalle());
        if($salleGuid->getId()!=$salleCible->getId()){
         //lieu ou lever l'exception si les deux personnages ne sont pas dans la meme salle
         throw new NotSameRoomException("vous n'etes pas dans la meme salle");
