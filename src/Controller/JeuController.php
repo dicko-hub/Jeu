@@ -21,6 +21,95 @@ use FOS\RestBundle\Controller\Annotations\View;
 
 class JeuController extends Controller
 {
+    //cette fonction creer un joueur et le retourne 
+    public function nouveauJoueur(){
+        $manager = $this->getDoctrine()->getManager();
+        //je recupere la premiere salle
+        $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
+        $salle = $SalleRepository->find(1);
+        $joueur=new Personnage();
+        //recuperation de l'id du dernier joueur pour allouer son incrementation a l'attribut guid du nouveau pour 
+        //garder une concordence entre les attribut id et guid d'un meme joueur
+        $PersonnageRepository = $this->getDoctrine()->getRepository(Personnage::class);
+        $joueurs=$PersonnageRepository->findBy(array(), array('id' => 'desc'),1,0);
+        $guid=$joueurs[0]->getId()+1;
+
+        $joueur->setGuid($guid)
+                ->setDegats(10)
+                ->setVie(100)
+                ->setDescription("vous etes un joueur, le numero $guid")
+                ->setTotalVie(100)
+                ->setSalle($salle)
+                ->setType("Joueur");
+
+        //persister le nouveau joueur dans la base
+        $manager->persist($joueur);
+        $manager->flush();
+        return $joueur;
+    }
+
+    public function modelerJoueur($joueur){
+        $salle=$joueur->getSalle();
+        $passages=[];
+        $entites=[];
+        //on cree un tableau qui contient les passages de ma salle du joueur
+        foreach ($joueur->getSalle()->getPassages() as $value)
+        {
+            array_push($passages,$value);
+        }
+        //on cree un tableau qui contient les joueurs dans la meme salle que le joueur
+        foreach ($salle->getPersonnages() as $key=>$value)
+        {
+          array_push($entites,$value->getGuid());
+        }
+        //on construit le meme d'affichage dans le protocole
+        $retour=["guid"=>$joueur->getGuid(),
+                 "totalVie"=>$joueur->getTotalVie(),
+                 "salle"=>[
+                     "description"=>$joueur->getSalle()->getDescription(),
+                     "passages"=>$passages,
+                     "entites"=>$entites
+                 ]
+    ];
+    return $retour;
+}
+        public function modelerSalle($joueur){
+            $salle=$joueur->getSalle();
+            //code de sortir vers le client
+        $passages=[];
+        $entites=[];
+        foreach ($salle->getPassages() as $value)
+        {
+            array_push($passages,$value);
+        }
+        foreach ($salle->getPersonnages() as $key=>$value)
+        {
+          array_push($entites,$value->getGuid());
+        }
+
+        $retour=[    "description"=>$salle->getDescription(),
+                     "passages"=>$passages,
+                     "entites"=>$entites
+    ];
+        return $retour;
+        }
+        public function examinerJoueur($cible){
+            $retour=["description"=>$cible->getDescription(),
+                "type"=>$cible->getType(),
+                "vie"=>$cible->getVie(),
+                "totalvie"=>$cible->getTotalVie(),
+   ];
+    return $retour;
+        }
+        public function ImpactTaper($joueurCible,$guid){
+        $manager = $this->getDoctrine()->getManager();
+        $vieActuelle=$joueurCible->getVie()- $guid->getDegats();
+        $degatsActuelle=$guid->getDegats()+5;
+        $joueurCible->setVie($vieActuelle);
+        $guid->setDegats($degatsActuelle);
+        $manager->persist($joueurCible,$guid);
+        $manager->flush();
+        }
     /**
      * @Route("/jeu", name="jeu")
      */
@@ -38,46 +127,13 @@ class JeuController extends Controller
      * )
      * @Rest\View(StatusCode = 201,serializerGroups={"connect_joueur"})
      */
-    public function creerJoueur()
+    public function creerJoueur(ObjectManager $manager)
     {
-        //je recupere la premiere salle
-        $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
-        $salle = $SalleRepository->find(1);
-        $joueur=new Personnage();
-        $PersonnageRepository = $this->getDoctrine()->getRepository(Personnage::class);
-        $joueurs=$PersonnageRepository->findBy(array(), array('id' => 'desc'),1,0);
-        $guid=$joueurs[0]->getId()+1;
-
-        
-        $joueur->setGuid($guid)
-                ->setDegats(mt_rand(0,100))
-                ->setVie(100)
-                ->setDescription("vous etes dans la premiere salle ")
-                ->setTotalVie(100)
-                ->setSalle($salle)
-                ->setType("Joueur");
+        //creer un joueur
+        $joueur= self::nouveauJoueur();
 
         //code de sortie vers le client
-        $passages=[];
-        $entites=[];
-        foreach ($joueur->getSalle()->getPassages() as $value)
-        {
-            array_push($passages,$value);
-        }
-        foreach ($salle->getPersonnages() as $key=>$value)
-        {
-          array_push($entites,$value->getGuid());
-        }
-
-        $retour=["guid"=>$joueur->getGuid(),
-                 "totalVie"=>$joueur->getTotalVie(),
-                 "salle"=>[
-                     "description"=>$joueur->getSalle()->getDescription(),
-                     "passages"=>$passages,
-                     "entites"=>$entites
-                 ]
-    ];
-        return $retour;
+        return self::modelerJoueur($joueur);
     }
 
      
@@ -91,26 +147,20 @@ class JeuController extends Controller
      */
     public function regarder(Personnage $guid)
     {
+        //code de verification de l'existence du joueur
+        $PersonnageRepository = $this->getDoctrine()->getRepository(Personnage::class);
+        try {
+            $joueurAverifier=$PersonnageRepository->find($guid->getId());
+        } catch (\Throwable $th) {
+            //lieu ou lever l'exception si l'identifiant du joueur n'existe pas
+        }
+        //code de recupereation de la salle du joueur 
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
         $salle = $SalleRepository->find($guid->getSalle());
 
-        //code de sortir vers le client
-        $passages=[];
-        $entites=[];
-        foreach ($salle->getPassages() as $value)
-        {
-            array_push($passages,$value);
-        }
-        foreach ($salle->getPersonnages() as $key=>$value)
-        {
-          array_push($entites,$value->getGuid());
-        }
-
-        $retour=[    "description"=>$salle->getDescription(),
-                     "passages"=>$passages,
-                     "entites"=>$entites
-    ];
-        return $retour;
+        //code de sortie vers le client
+        return self::modelerSalle($guid);
+        
     }
 
     /**
@@ -123,12 +173,18 @@ class JeuController extends Controller
      */
     public function deplacement(Personnage $guid,Request $request,ObjectManager $manager)
     {
-        $data = $request->getContent();
+        try {
+            $data = $request->getContent();
+        } catch (\Throwable $th) {
+            //lieu ou lever l'exception si aucune direction n'est reçu dans le corps du post
+        }
         $result= json_decode($data);
         $direction = $result->{'direction'};
+        $direction=strtoupper($direction);
 
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
         $salle = $SalleRepository->find($guid->getSalle());
+        $trouver=false;
         foreach ($salle->getPassages() as $key => $value)
         {
             if($direction==$value)
@@ -137,27 +193,22 @@ class JeuController extends Controller
                         $guid->setSalle($salleNext);
                 $manager->persist($guid);
                 $manager->flush();
+                $trouver=true;
             }
+        }
+        if(!$trouver){
+            //lieu ou declanchez l'exception si la direction n'existe pas
+           /* $message=[
+                "type"=> "MUR", 
+                "message"=>"Vous avez pris un mur",
+                "code"=>409
+            ];
+            return $message;*/
         }
         $salleActuel=$SalleRepository->find($guid->getSalle());
 
         //code de sortir vers le client
-        $passages=[];
-        $entites=[];
-        foreach ($salleActuel->getPassages() as $value)
-        {
-            array_push($passages,$value);
-        }
-        foreach ($salleActuel->getPersonnages() as $key=>$value)
-        {
-          array_push($entites,$value->getGuid());
-        }
-
-        $retour=[    "description"=>$salleActuel->getDescription(),
-                     "passages"=>$passages,
-                     "entites"=>$entites
-    ];
-        return $retour;
+        return self::modelerSalle($guid);
     }
 
      /**
@@ -171,17 +222,29 @@ class JeuController extends Controller
     public function examiner(Personnage $guid,Personnage $cible )
     {
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
+        $PersonnageRepository=$this->getDoctrine()->getRepository(Personnage::class);
+        try {
+            $guidAverifier=$PersonnageRepository->find($guid->getId());
+            $cibleAverifier=$PersonnageRepository->find($cible->getId());
+
+        } catch (\Throwable $th) {
+            //lieu ou lever l'exception si l'identifiant du joueur ou de la cible  n'existe pas
+        }
         $salleGuid = $SalleRepository->find($guid->getSalle());
         $salleCible = $SalleRepository->find($cible->getSalle());
-       // if($salleGuid->getId()==$salleCible->getId())
+        if($salleGuid->getId()!=$salleCible->getId()){
+            //lieu ou lever l'exception si les deux personnages ne sont pas dans la meme salle
+           /* $violations=[
+                "type"=> "DIFFSALLE", 
+                "message"=>"Vous n'êtes pas dans la même salle",
+            ];
+            return $this->view($violations,Response::HTTP_CONFLICT);*/
+
+        }
 
        //code de sortie vers le client
-       $retour=["description"=>$cible->getDescription(),
-                "type"=>$cible->getType(),
-                "vie"=>$cible->getVie(),
-                "totalvie"=>$cible->getTotalVie(),
-   ];
-        return $retour;
+       
+        return self::examinerJoueur($cible);
     }
 
      /**
@@ -192,28 +255,36 @@ class JeuController extends Controller
      * )
      * @Rest\View(serializerGroups={"joueur"})
      */
-    public function taper(Personnage $guid,Request $request,ObjectManager $manage)
+    public function taper(Personnage $guid,Request $request,ObjectManager $manager)
     {
-        $data = $request->getContent();
-        $result= json_decode($data);
-        $cible = $result->{'cible'};
+        $PersonnageRepository=$this->getDoctrine()->getRepository(Personnage::class);
+        try {
+            $guidAverifier=$PersonnageRepository->find($guid->getId());
+            $data = $request->getContent();
+            $result= json_decode($data);
+            $cible = $result->{'cible'};
+            $joueurCible=$PersonnageRepository->find($cible);
 
-        $PersonnageRepository= $this->getDoctrine()->getRepository(Personnage::class);
-        $joueurCible=$PersonnageRepository->find($cible);
+        } catch (\Throwable $th) {
+            //lieu ou lever l'exception si l'identifiant du joueur  n'existe pas
+        }
 
         $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
         $salleGuid = $SalleRepository->find($guid->getSalle());
         $salleCible = $SalleRepository->find($cible);
-       // if($salleGuid->getId()==$salleCible->getId())
+       //if($salleGuid->getId()!=$salleCible->getId()){
+        //lieu ou lever l'exception si les deux personnages ne sont pas dans la meme salle
+       /* $violations=[
+            "type"=> "DIFFSALLE", 
+            "message"=>"Vous n'êtes pas dans la même salle",
+        ];
+        return $this->view($violations,Response::HTTP_CONFLICT);
 
-       
+    }*/
+       //code effectuant les dommage de l'attaque sur la cible
+       self::ImpactTaper($joueurCible,$guid);
        //code de sortie vers le client
-       $retour=["description"=>$joueurCible->getDescription(),
-                "type"=>$joueurCible->getType(),
-                "vie"=>$joueurCible->getVie(),
-                "totalvie"=>$joueurCible->getTotalVie(),
-   ];
-        return $retour;
+        return self::examinerJoueur($joueurCible);
     }
 
   
