@@ -10,6 +10,12 @@ fos_rest:
   format_listener:
     rules:
       - { path: '^/', priorities: ['json'], fallback_format: 'json' }
+  exception:
+    enabled: true
+    codes:
+      { App\Exception\NotSameRoomException : 409, App\Exception\WallException : 409 , App\Exception\RessourceNotFound : 404 }
+    messages:
+      { App\Exception\NotSameRoomException : true ,App\Exception\WallException : true,App\Exception\RessourceNotFound: true}
 #    param_fetcher_listener:  true
 #    allowed_methods_listener:  true
 #    routing_loader: true
