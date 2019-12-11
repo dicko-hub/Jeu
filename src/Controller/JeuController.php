@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use App\Entity\Personnage;
 use App\Entity\Salle;
+use App\Exception\DeadException;
 use App\Repository\PersonnageRepository;
 use App\Repository\SalleRepository;
 use FOS\RestBundle\Controller\Annotations\Get;
@@ -21,6 +22,7 @@ use FOS\RestBundle\Controller\Annotations\View;
 use App\Exception\NotSameRoomException;
 use App\Exception\RessourceNotFound;
 use App\Exception\WallException;
+use App\Exception\SelfDestruction;
 
 class JeuController extends Controller
 {
@@ -107,7 +109,10 @@ class JeuController extends Controller
         }
 
     public function ImpactTaper($joueurCible,$guid){
-
+        if($joueurCible=$guid){
+            $message='{"type": "SelfDestruction", "message": "Vous vous attaquez vous meme (cest pas gentil pour les autres)"}';
+            throw new SelfDestruction($message);
+        }
         $manager = $this->getDoctrine()->getManager();
         $vieActuelle=$joueurCible->getVie()- $guid->getDegats();
         $degatsActuelle=$guid->getDegats()+5;
@@ -121,7 +126,7 @@ class JeuController extends Controller
 
         $manager = $this->getDoctrine()->getManager();
         if(empty($data) || !is_string((json_decode($data))->{'direction'}))
-            throw new NotSameRoomException("information json non valide");
+            throw new RessourceNotFound("information json non valide");
 
         $result= json_decode($data);
         $direction = $result->{'direction'};
@@ -143,7 +148,8 @@ class JeuController extends Controller
         }
         if(!$trouver){
             //lieu ou declanchez l'exception si la direction n'existe pas
-            throw new WallException("vous avez prix un mur");
+            $message='{"type": "MUR", "message": "Vous avez pris un mur"}';
+            throw new WallException($message);
            
         }
         }
@@ -155,9 +161,34 @@ class JeuController extends Controller
         $salleCible = $SalleRepository->find($cible->getSalle());
         if($salleGuid->getId()!=$salleCible->getId()){
             //lieu ou lever l'exception si les deux personnages ne sont pas dans la meme salle
-            throw new NotSameRoomException("vous n'etes pas dans la meme salle");
+            $message='{"type": "DIFFSALLE", "message": "Vous nêtes pas dans la même salle"}';
+            throw new NotSameRoomException($message);
         }
     }
+    
+    public function verifeCible($data){
+        $PersonnageRepository=$this->getDoctrine()->getRepository(Personnage::class);
+        if(empty($data) || !is_int((json_decode($data))->{'cible'}))
+            throw new RessourceNotFound("information json non valide");
+        $result= json_decode($data);
+        $cible = $result->{'cible'};
+        $joueurCible=$PersonnageRepository->find($cible);
+        if(!$joueurCible instanceof Personnage){
+            //lieu ou lever l'exception si l'identifiant du joueur  n'existe pas
+            throw new RessourceNotFound("votre cible  n'existe pas ");
+        }
+        return $joueurCible;
+
+    }
+
+    public function estEnVie($joueur){
+        if($joueur->getVie()<=0)
+        {
+            $message='{"type": "MORT", "message": "Joueur mort (pas de bol)"}';
+        throw new DeadException($message);
+        }
+    }
+
     /**
      * @Route("/jeu", name="jeu")
      */
@@ -195,6 +226,8 @@ class JeuController extends Controller
      */
     public function regarder(Personnage $guid)
     {
+        //verifie si le joueur est en vie sinon DeadException
+        self::estEnVie($guid);
         //code de sortie vers le client
         return self::modelerSalle($guid);
         
@@ -210,6 +243,9 @@ class JeuController extends Controller
      */
     public function deplacement(Personnage $guid,Request $request,ObjectManager $manager)
     {
+            //verifie si le joueur est en vie sinon DeadException
+            self::estEnVie($guid);
+
             $data = $request->getContent();
             //lieu ou lever l'exception si aucune direction n'est reçu dans le corps du post ou invalide
             self::executionDeplacement($guid,$data);
@@ -227,6 +263,9 @@ class JeuController extends Controller
      */
     public function examiner(Personnage $guid,Personnage $cible )
     {
+        //verifie si le joueur est en vie sinon DeadException
+        self::estEnVie($guid);
+
         //verifie si ils sont dans la meme salle, sinon il aura une exception
         self::memeSalle($guid,$cible);
 
@@ -245,26 +284,17 @@ class JeuController extends Controller
      */
     public function taper(Personnage $guid,Request $request,ObjectManager $manager)
     {
-        $PersonnageRepository=$this->getDoctrine()->getRepository(Personnage::class);
-    
-            $data = $request->getContent();
-            if(empty($data) || !is_int((json_decode($data))->{'cible'}))
-                throw new NotSameRoomException("information json non valide");
-            $result= json_decode($data);
-            $cible = $result->{'cible'};
-            $joueurCible=$PersonnageRepository->find($cible);
-            if(!$joueurCible instanceof Personnage){
-                //lieu ou lever l'exception si l'identifiant du joueur  n'existe pas
-                throw new RessourceNotFound("votre cible  n'existe pas ");
-            }
+        //verifie si le joueur est en vie sinon DeadException
+        self::estEnVie($guid);
 
-        $SalleRepository = $this->getDoctrine()->getRepository(Salle::class);
-        $salleGuid = $SalleRepository->find($guid->getSalle());
-        $salleCible = $SalleRepository->find($joueurCible->getSalle());
-       if($salleGuid->getId()!=$salleCible->getId()){
-        //lieu ou lever l'exception si les deux personnages ne sont pas dans la meme salle
-        throw new NotSameRoomException("vous n'etes pas dans la meme salle");
-    }
+        $data = $request->getContent();
+           //verifie si la donnee envoyer en json est correct si la cible existe sinon exeption
+           $joueurCible=self::verifeCible($data);
+
+           //verifie si le joueur est en vie sinon DeadException
+        self::estEnVie($joueurCible);
+        //verifie si les deux joueur sont dans la meme salle
+        self::memeSalle($guid,$joueurCible);
        //code effectuant les dommage de l'attaque sur la cible
        self::ImpactTaper($joueurCible,$guid);
        //code de sortie vers le client
