@@ -13,9 +13,11 @@ fos_rest:
   exception:
     enabled: true
     codes:
-      { App\Exception\NotSameRoomException : 409, App\Exception\WallException : 409 , App\Exception\RessourceNotFound : 404, App\Exception\DeadException : 409}
+      { App\Exception\NotSameRoomException : 409, App\Exception\WallException : 409 , App\Exception\RessourceNotFound : 404, 
+      App\Exception\DeadException : 409, App\Exception\SelfDestruction : 409}
     messages:
-      { App\Exception\NotSameRoomException : true ,App\Exception\WallException : true,App\Exception\RessourceNotFound: true, App\Exception\DeadException : true}
+      { App\Exception\NotSameRoomException : true ,App\Exception\WallException : true,App\Exception\RessourceNotFound: true,
+       App\Exception\DeadException : true, App\Exception\SelfDestruction : true}
 #    param_fetcher_listener:  true
 #    allowed_methods_listener:  true
 #    routing_loader: true
